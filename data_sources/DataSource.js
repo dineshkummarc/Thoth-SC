@@ -56,6 +56,8 @@ ThothSC.DataSource = SC.DataSource.extend({
    
    authenticationPane: null,
    
+   ThothUploadURL: null, 
+   
    propertyBasedRetrieval: null,
    
    /*
@@ -73,6 +75,7 @@ ThothSC.DataSource = SC.DataSource.extend({
    init: function(){ // constructor
      sc_super();
      this.ThothURLPrefix = '/thoth';
+     this.ThothUploadURL= '/upload';
    },
          
    connect: function(store,callback){ // we need the store to direct the push traffic to
@@ -325,6 +328,8 @@ ThothSC.DataSource = SC.DataSource.extend({
       if(data.deleteRecordError) this.onDeleteRecordError(data);
       if(data.rpcResult) this.onRPCResult(data);
       if(data.rpcError) this.onRPCError(data);
+      if(data.uploadResult) this.onUploadResult(data);
+      if(data.uploadError) this.onUploadError(data);
    },
    
    _rpcRequestCache: null,
@@ -356,6 +361,40 @@ ThothSC.DataSource = SC.DataSource.extend({
          var rpcError = data.rpcError;
          var cacheKey = rpcError.returnData.cacheKey;
          this._rpcRequestCache[cacheKey].callback(rpcError);
+      }
+   },
+   
+   _uploadRequestCache: null,
+   
+   uploadRequest: function(functionName,params,callback){
+      // generate an Upload request to Thoth
+      var cacheKey = this._createRequestCacheKey();
+      if(!this._uploadRequestCache) this._uploadRequestCache = {};
+      if(!this._uploadRequestCache[cacheKey]) this._uploadRequestCache[cacheKey] = { callback: callback };
+
+      console.log('this is the cache key ', cacheKey);
+      this.send( { uploadRequest: { functionName: functionName, params: params, returnData: { uploadCacheKey: cacheKey } }});
+   },
+   
+   onUploadResult: function(data){
+      if(!this._uploadRequestCache) throw "Thoth DataSource: received an Upload onUpload result but no request has been sent";
+      else {
+         var uploadResult = data.uploadResult;
+         if(uploadResult){
+            var cacheKey = uploadResult.returnData.uploadCacheKey;
+            this._uploadRequestCache[cacheKey].callback(uploadResult);
+            delete this._uploadRequestCache[cacheKey]; // clean up
+         }
+         else throw "Thoth DataSource: received an invalid uploadResult message";
+      }
+   },
+   
+   onUploadError: function(data){
+      if(!this._uploadRequestCache) throw "Thoth DataSource: received an Upload onUpload error but no request has been sent";
+      else {
+         var uploadError = data.uploadError;
+         var cacheKey = uploadError.returnData.cacheKey;
+         this._uploadRequestCache[cacheKey].callback(uploadError);
       }
    },
    
