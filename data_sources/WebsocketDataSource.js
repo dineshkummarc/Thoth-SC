@@ -6,6 +6,8 @@ ThothSC.WebSocketDataSource = ThothSC.DataSource.extend({
    
    shouldReconnect: YES,
    
+   reconnectAttempts: 3,
+   
    _webSocket: null, // the websocket object will be stored here
    
    connect: function(store,callback){ // we need the store to direct the push traffic to
@@ -21,12 +23,15 @@ ThothSC.WebSocketDataSource = ThothSC.DataSource.extend({
    
    send: function(val){
       if(this._webSocket && val){
+         this._reconnectCount = 0; // reset the counter when being able to send something
          var msg = JSON.stringify(val);
          console.log('Trying to send message: ' + msg);
          this._webSocket.send(msg); // cannot return anything as the calling function is most likely GC'ed already
       }
       else return false;
    },
+   
+   _reconnectCount: 0,
    
    createOnCloseHandler: function(event){
       var me = this;
@@ -37,10 +42,16 @@ ThothSC.WebSocketDataSource = ThothSC.DataSource.extend({
          if(me.shouldReconnect){
            if(me.sendAuthRequest){
              console.log('WebSocket: trying to reconnect...');
-             me.connect(null,function(){
-               // reauth using auth closure
-               me.sendAuthRequest();
-             });
+             me._reconnectCount += 1;
+             if(me._reconnectCount < me.reconnectAttempts){
+               me.connect(null,function(){
+                 // reauth using auth closure
+                 me.sendAuthRequest();
+               });               
+             }
+             else {
+               console.log('WebSocket: failed to reconnect after ' + count + ' times. Reconnect by reloading the app?');
+             }
            }
            else console.log('WS Connection closed, you need to reauth to continue...');
          } 
