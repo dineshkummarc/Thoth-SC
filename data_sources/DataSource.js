@@ -56,6 +56,8 @@ ThothSC.DataSource = SC.DataSource.extend({
    
    authenticationPane: null,
    
+   ThothUploadURL: null, 
+   
    propertyBasedRetrieval: null,
    
    /*
@@ -73,6 +75,7 @@ ThothSC.DataSource = SC.DataSource.extend({
    init: function(){ // constructor
      sc_super();
      this.ThothURLPrefix = '/thoth';
+     this.ThothUploadURL= '/upload';
    },
          
    connect: function(store,callback){ // we need the store to direct the push traffic to
@@ -325,6 +328,8 @@ ThothSC.DataSource = SC.DataSource.extend({
       if(data.deleteRecordError) this.onDeleteRecordError(data);
       if(data.rpcResult) this.onRPCResult(data);
       if(data.rpcError) this.onRPCError(data);
+      if(data.uploadRequestResult) this.onUploadRequestResult(data);
+      if(data.uploadRequestError) this.onUploadRequestError(data);
    },
    
    _rpcRequestCache: null,
@@ -359,11 +364,59 @@ ThothSC.DataSource = SC.DataSource.extend({
       }
    },
    
-   /*
-      =====
-      Push callbacks
-      =====
-   */
+   _uploadRequestCache: null,
+
+   uploadRequest: function(functionName,params,callback){
+      // generate an Upload request to Thoth
+      var cacheKey = this._createRequestCacheKey();
+      if(!this._uploadRequestCache) this._uploadRequestCache = {};
+      if(!this._uploadRequestCache[cacheKey]) this._uploadRequestCache[cacheKey] = { callback: callback };
+
+      console.log('this is the cache key ', cacheKey);
+      console.log('these are the params ', params.toString());
+      this.send( { uploadRequest: { functionName: functionName, params: params, returnData: { uploadRequestCacheKey: cacheKey } }});
+   },
+   
+   onUploadRequestResult: function(data){
+      if(!this._uploadRequestCache) throw "Thoth DataSource: received an Upload onUpload result but no request has been sent";
+      else {
+         var uploadRequestResult = data.uploadRequestResult;
+
+         console.log('data.uploadRequestResult ', SC.inspect(data.uploadRequestResult));
+         if(uploadRequestResult){
+            var cacheKey = uploadRequestResult.returnData.uploadRequestCacheKey;
+
+            console.log('uploadRequestCacheKey ', cacheKey);
+            this._uploadRequestCache[cacheKey].callback(uploadRequestResult);
+            delete this._uploadRequestCache[cacheKey]; // clean up
+         }
+         else throw "Thoth DataSource: received an invalid uploadRequestResult message";
+      }
+   },
+
+   onUploadRequestError: function(data){
+      if(!this._uploadRequestCache) throw "Thoth DataSource: received an Upload onUpload error but no request has been sent";
+      else {
+         var uploadError = data.uploadError;
+         var cacheKey = uploadError.returnData.cacheKey;
+         this._uploadRequestCache[cacheKey].callback(uploadError);
+      }
+   },
+
+   uploadFiles: function(url,formData){
+      // upload to Thoth
+     var longURL = '/thoth' + url;
+      console.log('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
+      console.log(longURL);
+      var xhr = SC.Request.postUrl(longURL).set('isJSON',false).set('isXML',false).send(formData);
+      //var xhr = SC.Request.postUrl(longURL).send(formData);
+   },
+
+  /*
+     =====
+     Push callbacks
+     =====
+  */
    
    onPushedCreateRecord: function(data){
       // function to process the creation of a record in the store with the pushed data by the server
