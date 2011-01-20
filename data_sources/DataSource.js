@@ -365,7 +365,7 @@ ThothSC.DataSource = SC.DataSource.extend({
    },
    
    _uploadRequestCache: null,
-
+   
    uploadRequest: function(functionName,params,callback){
       // generate an Upload request to Thoth
       var cacheKey = this._createRequestCacheKey();
@@ -393,7 +393,7 @@ ThothSC.DataSource = SC.DataSource.extend({
          else throw "Thoth DataSource: received an invalid uploadRequestResult message";
       }
    },
-
+   
    onUploadRequestError: function(data){
       if(!this._uploadRequestCache) throw "Thoth DataSource: received an Upload onUpload error but no request has been sent";
       else {
@@ -403,14 +403,24 @@ ThothSC.DataSource = SC.DataSource.extend({
       }
    },
 
-   uploadFiles: function(url,formData){
-      // upload to Thoth
-     var longURL = '/thoth' + url;
-      console.log('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
-      console.log(longURL);
-      var xhr = SC.Request.postUrl(longURL).set('isJSON',false).set('isXML',false).send(formData);
-      //var xhr = SC.Request.postUrl(longURL).send(formData);
-   },
+  performUpload: function(url,formData,callback){
+    // upload to Thoth
+    //this.send( { upload: { url: url, formData: formData, returnData: { } }});
+    var parts = url.split('/');
+    console.log('parts[0]', parts[0]);
+    console.log('parts[1]', parts[1]);
+//    var request = {
+//      upload: {
+//        bucket: 'upload',
+//        key: parts[1],
+//        formData: formData,
+//        returnData: { }
+//      }
+//    };
+    formData.set('bucket', 'upload');
+    formData.set('key', parts[1]);
+    this.send(request);
+  },
 
   /*
      =====
